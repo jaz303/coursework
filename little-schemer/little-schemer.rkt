@@ -426,6 +426,162 @@
     (lambda (rel)
       (and (set? (firsts rel)) (set? (firsts (revrel rel))))))
 
+  ; 8 - Lambda The Ultimate
+  
+;  (define rember-f
+;    (lambda (test? a l)
+;      (cond
+;        ((null? l) '())
+;        ((test? a (car l)) (cdr l))
+;        (else (cons (car l) (rember-f test? a (cdr l)))))))
+  
+  (define eq?-c
+    (lambda (a)
+      (lambda (x)
+        (eq? a x))))
+  
+  (define rember-f
+    (lambda (test?)
+      (lambda (a l)
+        (cond
+          ((null? l) '())
+          ((test? a (car l)) (cdr l))
+          (else (cons (car l) ((rember-f test?) a (cdr l))))))))
+  
+  (define insertL-f
+    (lambda (test?)
+      (lambda (new old l)
+        (cond
+          ((null? l) '())
+          ((test? old (car l)) (cons new l))
+          (else (cons (car l) ((insertL-f test?) new old (cdr l))))))))
+  
+  (define insertR-f
+    (lambda (test?)
+      (lambda (new old l)
+        (cond
+          ((null? l) '())
+          ((test? old (car l)) (cons (car l) (cons new (cdr l))))
+          (else (cons (car l) ((insertR-f test?) new old (cdr l))))))))
+  
+  (define seqL
+    (lambda (new old l)
+      (cons new (cons old l))))
+  
+  (define seqR
+    (lambda (new old l)
+      (cons old (cons new l))))
+  
+  (define insert-g
+    (lambda (seq)
+      (lambda (new old l)
+        (cond
+          ((null? l) '())
+          ((eq? old (car l)) (seq new old (cdr l)))
+          (else (cons (car l) ((insert-g seq) new old (cdr l))))))))
+  
+  (define insertL (insert-g seqL))
+  (define insertR (insert-g seqR))
+  
+  (define seqS
+    (lambda (new old l)
+      (cons new l)))
+  
+  (define subst (insert-g seqS))
+  
+  (define atom-to-function
+    (lambda (x)
+      (cond
+        ((eq? x '+) o+)
+        ((eq? x '*) o*)
+        (else o/))))
+  
+  (define operator
+    (lambda (l)
+      (atom-to-function (car l))))
+  
+  (define value
+    (lambda (nexp)
+      (cond
+        ((atom? nexp) nexp)
+        (else ((operator nexp) (value (cadr nexp)) (value (caddr nexp)))))))
+  
+  (define multirember-f
+    (lambda (test?)
+      (lambda (a lat)
+        (cond
+          ((null? lat) '())
+          ((test? (car lat) a) ((multirember-f test?) a (cdr lat)))
+          (else (cons (car lat) ((multirember-f test?) a (cdr lat))))))))
+  
+  (define multirember-eq? (multirember-f eq?))
+  
+  (define eq?-tuna (eq?-c 'tuna))
+  
+  (define multiremberT
+    (lambda (test? lat)
+      (cond
+        ((null? lat) '())
+        ((test? (car lat)) (multiremberT test? (cdr lat)))
+        (else (cons (car lat) (multiremberT test? (cdr lat)))))))
+  
+  (define a-friend
+    (lambda (x y)
+      (null? y)))
+  
+  (define partition
+    (lambda (test? lat col)
+      (cond
+        ((null? lat) (col '() '()))
+        ((test? (car lat))
+         (partition test? (cdr lat)
+                    (lambda (matching non-matching)
+                      (col (cons (car lat) matching) non-matching))))
+        (else
+         (partition test? (cdr lat)
+                    (lambda (matching non-matching)
+                      (col matching (cons (car lat) non-matching))))))))
+  
+  (define is-tuna?
+    (lambda (a)
+      (eq? a 'tuna)))
+  
+  (define multiinsertLR&co
+    (lambda (new oldL oldR lat col)
+      (cond
+        ((null? lat) (col '() 0 0))
+        ((eq? oldL (car lat))
+         (multiinsertLR&co new oldL oldR (cdr lat)
+                           (lambda (newlat countL countR)
+                             (col (cons new (cons oldL newlat)) (add1 countL) countR))))
+        ((eq? oldR (car lat))
+         (multiinsertLR&co new oldL oldR (cdr lat)
+                           (lambda (newlat countL countR)
+                             (col (cons oldR (cons new newlat)) countL (add1 countR)))))
+        (else (multiinsertLR&co new oldL oldR
+                                (lambda (newlat countL countR)
+                                  (col (cons (car lat) newlat) countL countR)))))))
+  
+  (define evens-only*&co
+    (lambda (l col)
+      (cond
+        ((null? l) (col '() 1 0))
+        ((atom? (car l))
+         (cond
+           ((even? (car l))
+            (evens-only*&co (cdr l)
+                            (lambda (newl evens-product odds-sum)
+                              (col (cons (car l) newl) (* evens-product (car l)) odds-sum))))
+           (else
+            (evens-only*&co (cdr l)
+                            (lambda (newl p s)
+                              (col newl p (+ (car l) s)))))))
+        (else
+         (evens-only*&co (car l)
+                         (lambda (al ap as)
+                           (evens-only*&co (cdr l)
+                                           (lambda (newl p s)
+                                             (col (cons al newl) (* p ap) (+ s as))))))))))
   
   
 )
