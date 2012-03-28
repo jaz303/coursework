@@ -20,10 +20,12 @@ _main:
 		decl %edi
 		jnz fib_loop
 	
-	subl $0x04, %esp
-	pushl %eax
-	pushl $format_str
-	call _printf
-	addl $0x0c, %esp
+	subl $0x04, %esp			# align stack
+	pushl %eax						# %i
+	pushl $format_str			# format string
+	call _printf					# printf()
+	addl $0x0c, %esp			# restore the stack
+	
+	movl $0x00, %eax			# return 0
 	
 	ret
