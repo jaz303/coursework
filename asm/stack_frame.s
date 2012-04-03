@@ -3,12 +3,13 @@
 .globl _main
 
 _main:
+  subl $12, %esp
 	pushl $22
 	pushl $20
 	pushl $42
 	pushl $3
 	call sum_numbers
-	addl $16, %esp
+	addl $28, %esp
 	
   subl $4, %esp
   push %eax
