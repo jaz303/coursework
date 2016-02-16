@@ -1,14 +1,17 @@
+#include <OpenGL/gl3.h>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl.h>
 #include <stdio.h>
 
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
 
+typedef float real;
+#define GL_REAL GL_FLOAT
+
 struct Vertex {
-    float x, y, z;
-    float nx, ny, nz;
-    float s0, t0;
+    real x, y, z;
+    real nx, ny, nz;
+    real s0, t0;
 };
 
 class MyShape {
@@ -18,7 +21,7 @@ public:
 		Vertex pvertex[3];
 		//VERTEX 0
 		pvertex[0].x = 0.0;
-		pvertex[0].y = 0.0;
+		pvertex[0].y = 0.75;
 		pvertex[0].z = 0.0;
 		pvertex[0].nx = 0.0;
 		pvertex[0].ny = 0.0;
@@ -26,8 +29,8 @@ public:
 		pvertex[0].s0 = 0.0;
 		pvertex[0].t0 = 0.0;
 		//VERTEX 1
-		pvertex[1].x = 1.0;
-		pvertex[1].y = 0.0;
+		pvertex[1].x = -0.75;
+		pvertex[1].y = -0.75;
 		pvertex[1].z = 0.0;
 		pvertex[1].nx = 0.0;
 		pvertex[1].ny = 0.0;
@@ -35,8 +38,8 @@ public:
 		pvertex[1].s0 = 1.0;
 		pvertex[1].t0 = 0.0;
 		//VERTEX 2
-		pvertex[2].x = 0.0;
-		pvertex[2].y = 1.0;
+		pvertex[2].x = 0.75;
+		pvertex[2].y = -0.75;
 		pvertex[2].z = 0.0;
 		pvertex[2].nx = 0.0;
 		pvertex[2].ny = 0.0;
@@ -49,30 +52,28 @@ public:
 		pindices[1] = 1;
 		pindices[2] = 2;
 
-		glGenBuffers(1, &vboID_);
+        glGenBuffers(1, &vboID_);
 		glBindBuffer(GL_ARRAY_BUFFER, vboID_);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)*3, &pvertex[0].x, GL_STATIC_DRAW);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-		glGenBuffers(1, &vaoID_);
-		
-		glBindBuffer(GL_ARRAY_BUFFER, vboID_);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vaoID_);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(ushort)*3, pindices, GL_STATIC_DRAW);
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, sizeof(Vertex), (void*)0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        glGenVertexArrays(1, &vaoID_);
+        glBindVertexArray(vaoID_);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_REAL, GL_FALSE, sizeof(Vertex), NULL);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
 	}
 
 	~MyShape() {
 		glDeleteBuffers(1, &vboID_);
-		//glDeleteVertexArrays(1, &vaoID_);
+		glDeleteVertexArrays(1, &vaoID_);
 	}
 
 	void draw() {
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vaoID_);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        glBindVertexArray(vaoID_);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindVertexArray(0);
 	}
 
 private:
@@ -92,6 +93,65 @@ SDL_Window* gWindow = NULL;
 SDL_GLContext gContext;
 bool gRenderQuad = true;
 
+MyShape *gShape;
+GLuint gProgram;
+
+const char *VERTEX_SHADER =
+    "#version 400\n"
+    "layout(location = 0) in vec3 vertex_position;\n"
+    "void main() {\n"
+    "  gl_Position = vec4(vertex_position, 1.0);\n"
+    "}\n";
+
+const char *FRAGMENT_SHADER =
+    "#version 400\n"
+    "out vec4 frag_colour;\n"
+    "void main() {\n"
+    "  frag_colour = vec4(1.0, 1.0, 1.0, 1.0);\n"
+    "}\n";
+
+GLuint compileShader(const char *source, GLuint type) {
+    GLuint shader = glCreateShader(type);
+    if (shader == 0) {
+        return 0;
+    }
+    glShaderSource(shader, 1, &source, NULL);
+    glCompileShader(shader);
+    GLint success = 0;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (success == GL_FALSE) {
+        printf("shader compile error\n");
+        return 0;
+    }
+    return shader;
+}
+
+GLuint compileShaderProgram(const char *vertexShader, const char *fragmentShader) {
+    GLuint vs = compileShader(vertexShader, GL_VERTEX_SHADER);
+    GLuint fs = compileShader(fragmentShader, GL_FRAGMENT_SHADER);
+    if (vs == 0 || fs == 0) {
+        // TODO: destroy
+        return 0;
+    }
+    GLuint prog = glCreateProgram();
+    if (prog == 0) {
+        // TODO: destroy
+        return prog;
+    }
+    glAttachShader(prog, vs);
+    glAttachShader(prog, fs);
+    glLinkProgram(prog);
+    GLint success = 0;
+    glGetProgramiv(prog, GL_LINK_STATUS, (int*)&success);
+    if (success == GL_FALSE) {
+        printf("shader link error\n");
+        // TODO: destroy
+        return 0;
+    }
+    return prog;
+}
+
+
 bool init()
 {
     //Initialization flag
@@ -105,9 +165,9 @@ bool init()
     }
     else
     {
-        //Use OpenGL 2.1
-        SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 2 );
-        SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 1 );
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
         //Create window
         gWindow = SDL_CreateWindow( "SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN );
@@ -132,57 +192,10 @@ bool init()
                 {
                     printf( "Warning: Unable to set VSync! SDL Error: %s\n", SDL_GetError() );
                 }
-
-                //Initialize OpenGL
-                if( !initGL() )
-                {
-                    printf( "Unable to initialize OpenGL!\n" );
-                    success = false;
-                }
             }
         }
     }
 
-    return success;
-}
-
-bool initGL()
-{
-    bool success = true;
-    GLenum error = GL_NO_ERROR;
-
-    //Initialize Projection Matrix
-    glMatrixMode( GL_PROJECTION );
-    glLoadIdentity();
-    
-    //Check for error
-    error = glGetError();
-    if( error != GL_NO_ERROR )
-    {
-        success = false;
-    }
-
-    //Initialize Modelview Matrix
-    glMatrixMode( GL_MODELVIEW );
-    glLoadIdentity();
-
-    //Check for error
-    error = glGetError();
-    if( error != GL_NO_ERROR )
-    {
-        success = false;
-    }
-    
-    //Initialize clear color
-    glClearColor( 0.f, 0.f, 0.f, 1.f );
-    
-    //Check for error
-    error = glGetError();
-    if( error != GL_NO_ERROR )
-    {
-        success = false;
-    }
-    
     return success;
 }
 
@@ -200,23 +213,9 @@ void update()
 
 void render()
 {
-    //Clear color buffer
-    glClear( GL_COLOR_BUFFER_BIT );
-    
-    //Render quad
-    if( gRenderQuad )
-    {
-        glRotatef(0.4f,0.0f,1.0f,0.0f);    // Rotate The cube around the Y axis
-        glRotatef(0.2f,1.0f,1.0f,1.0f);
-        glColor3f(0.0f,1.0f,0.0f); 
-
-        glBegin( GL_QUADS );
-            glVertex2f( -0.5f, -0.5f );
-            glVertex2f( 0.5f, -0.5f );
-            glVertex2f( 0.5f, 0.5f );
-            glVertex2f( -0.5f, 0.5f );
-        glEnd();
-    }
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glUseProgram(gProgram);
+    gShape->draw();
 }
 
 void close()
@@ -231,50 +230,50 @@ void close()
 
 int main( int argc, char* args[] )
 {
-    //Start up SDL and create window
-    if( !init() )
-    {
+    if (!init()) {
         printf( "Failed to initialize!\n" );
     }
-    else
+
+    gProgram = compileShaderProgram(VERTEX_SHADER, FRAGMENT_SHADER);
+    gShape = new MyShape();
+
+    glEnable(GL_CULL_FACE);
+
+    //Event handler
+    SDL_Event e;
+    
+    //Enable text input
+    SDL_StartTextInput();
+
+    //While application is running
+    while( !quit )
     {
-
-        //Event handler
-        SDL_Event e;
-        
-        //Enable text input
-        SDL_StartTextInput();
-
-        //While application is running
-        while( !quit )
+        //Handle events on queue
+        while( SDL_PollEvent( &e ) != 0 )
         {
-            //Handle events on queue
-            while( SDL_PollEvent( &e ) != 0 )
+            //User requests quit
+            if( e.type == SDL_QUIT )
             {
-                //User requests quit
-                if( e.type == SDL_QUIT )
-                {
-                    quit = true;
-                }
-                //Handle keypress with current mouse position
-                else if( e.type == SDL_TEXTINPUT )
-                {
-                    int x = 0, y = 0;
-                    SDL_GetMouseState( &x, &y );
-                    handleKeys( e.text.text[ 0 ], x, y );
-                }
+                quit = true;
             }
-
-            //Render quad
-            render();
-            
-            //Update screen
-            SDL_GL_SwapWindow( gWindow );
+            //Handle keypress with current mouse position
+            else if( e.type == SDL_TEXTINPUT )
+            {
+                int x = 0, y = 0;
+                SDL_GetMouseState( &x, &y );
+                handleKeys( e.text.text[ 0 ], x, y );
+            }
         }
+
+        //Render quad
+        render();
         
-        //Disable text input
-        SDL_StopTextInput();
+        //Update screen
+        SDL_GL_SwapWindow( gWindow );
     }
+    
+    //Disable text input
+    SDL_StopTextInput();
 
     //Free resources and close SDL
     close();
