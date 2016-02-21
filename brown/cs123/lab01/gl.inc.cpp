@@ -8,7 +8,7 @@ GLuint gl_compileShader(const char *source, GLuint type) {
     GLint success = 0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (success == GL_FALSE) {
-        printf("shader compile error\n");
+        fprintf(stderr, "shader compile error\n");
         return 0;
     }
     return shader;
@@ -32,7 +32,7 @@ GLuint gl_compileShaderProgram(const char *vertexShader, const char *fragmentSha
     GLint success = 0;
     glGetProgramiv(prog, GL_LINK_STATUS, (int*)&success);
     if (success == GL_FALSE) {
-        printf("shader link error\n");
+        fprintf(stderr, "shader link error\n");
         // TODO: destroy
         return 0;
     }
