@@ -1,4 +1,0 @@
-[ ] tidy up, split into files
-[ ] extract shape class
-[ ] learn about vertex arrays, glVertexAttribPointer() etc
-[ ] do triangle strip, triangle fan examples
